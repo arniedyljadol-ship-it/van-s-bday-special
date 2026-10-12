@@ -99,7 +99,7 @@
       </div>
 
       <ol id="descList" class="numbered-list">
-        <!-- Starts completely empty -->
+        <!-- Rendered from localStorage -->
       </ol>
       <p id="emptyDescNotice" class="empty-notice">No entries yet. Be the first to describe Van!</p>
     </section>
@@ -118,7 +118,7 @@
       </div>
 
       <div id="desertWall" class="notes-grid">
-        <!-- Starts completely empty -->
+        <!-- Rendered from localStorage -->
       </div>
       <p id="emptyDesertNotice" class="empty-notice">No answers submitted yet. Leave your reason above!</p>
     </section>
@@ -164,6 +164,13 @@
     const gfBtn = document.getElementById('gfBtn');
     const rsvpMessage = document.getElementById('rsvpMessage');
 
+    // Restore RSVP status if previously clicked
+    if (localStorage.getItem('van_rsvp_status') === 'confirmed') {
+      rsvpMessage.style.display = 'block';
+      rsvpMessage.className = 'rsvp-message success';
+      rsvpMessage.innerHTML = "🎉 <strong>LOCKED IN!</strong> Senior’s Inner Circle is reserving your seat at Fev's Diner, Van! Come with an empty stomach!";
+    }
+
     yesBtn.addEventListener('click', () => {
       confetti({
         particleCount: 120,
@@ -173,6 +180,7 @@
       rsvpMessage.style.display = 'block';
       rsvpMessage.className = 'rsvp-message success';
       rsvpMessage.innerHTML = "🎉 <strong>LOCKED IN!</strong> Senior’s Inner Circle is reserving your seat at Fev's Diner, Van! Come with an empty stomach!";
+      localStorage.setItem('van_rsvp_status', 'confirmed');
     });
 
     const excuses = [
@@ -195,68 +203,7 @@
       excuseIdx++;
     });
 
-    // --- 10 Things to Describe Van Accel ---
-    const descList = document.getElementById('descList');
-    const descInput = document.getElementById('descInput');
-    const descAuthor = document.getElementById('descAuthor');
-    const addDescBtn = document.getElementById('addDescBtn');
-    const tenThingsCount = document.getElementById('tenThingsCount');
-    const emptyDescNotice = document.getElementById('emptyDescNotice');
-
-    function updateCounter() {
-      const count = descList.children.length;
-      tenThingsCount.innerText = `${count} / 10 Listed`;
-      if (count > 0) {
-        emptyDescNotice.style.display = 'none';
-      } else {
-        emptyDescNotice.style.display = 'block';
-      }
-      if (count >= 10) {
-        tenThingsCount.style.background = '#059669';
-      }
-    }
-    updateCounter();
-
-    addDescBtn.addEventListener('click', () => {
-      const text = descInput.value.trim();
-      const author = descAuthor.value.trim() || 'Senior’s Inner Circle';
-      if (!text) return;
-
-      const li = document.createElement('li');
-      li.innerHTML = `<span class="item-text">${escapeHtml(text)}</span> <span class="author-tag">— ${escapeHtml(author)}</span>`;
-      descList.appendChild(li);
-      
-      descInput.value = '';
-      descAuthor.value = '';
-      updateCounter();
-    });
-
-    // --- Desert Stuck Prompt Wall ---
-    const desertWall = document.getElementById('desertWall');
-    const desertInput = document.getElementById('desertInput');
-    const desertAuthor = document.getElementById('desertAuthor');
-    const addDesertBtn = document.getElementById('addDesertBtn');
-    const emptyDesertNotice = document.getElementById('emptyDesertNotice');
-
-    addDesertBtn.addEventListener('click', () => {
-      const text = desertInput.value.trim();
-      const author = desertAuthor.value.trim() || 'Senior’s Inner Circle';
-      if (!text) return;
-
-      emptyDesertNotice.style.display = 'none';
-
-      const note = document.createElement('div');
-      note.className = 'note-card';
-      note.innerHTML = `
-        <p class="note-text">"...${escapeHtml(text)}"</p>
-        <div class="note-footer">— ${escapeHtml(author)}</div>
-      `;
-      desertWall.prepend(note);
-
-      desertInput.value = '';
-      desertAuthor.value = '';
-    });
-
+    // --- Utility: Escape HTML ---
     function escapeHtml(string) {
       return String(string)
         .replace(/&/g, '&amp;')
@@ -265,6 +212,127 @@
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
     }
+
+    // ==========================================
+    // PERSISTENCE LOGIC (LOCAL STORAGE)
+    // ==========================================
+
+    // --- 1. 10 Things to Describe Van Accel ---
+    const descList = document.getElementById('descList');
+    const descInput = document.getElementById('descInput');
+    const descAuthor = document.getElementById('descAuthor');
+    const addDescBtn = document.getElementById('addDescBtn');
+    const tenThingsCount = document.getElementById('tenThingsCount');
+    const emptyDescNotice = document.getElementById('emptyDescNotice');
+
+    function getSavedDescriptions() {
+      try {
+        return JSON.parse(localStorage.getItem('van_descriptions')) || [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveDescriptions(data) {
+      localStorage.setItem('van_descriptions', JSON.stringify(data));
+    }
+
+    function renderDescriptions() {
+      const descriptions = getSavedDescriptions();
+      descList.innerHTML = '';
+      
+      descriptions.forEach(item => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span class="item-text">${escapeHtml(item.text)}</span> <span class="author-tag">— ${escapeHtml(item.author)}</span>`;
+        descList.appendChild(li);
+      });
+
+      const count = descriptions.length;
+      tenThingsCount.innerText = `${count} / 10 Listed`;
+      if (count > 0) {
+        emptyDescNotice.style.display = 'none';
+      } else {
+        emptyDescNotice.style.display = 'block';
+      }
+      if (count >= 10) {
+        tenThingsCount.style.background = '#059669';
+      } else {
+        tenThingsCount.style.background = 'var(--primary-red)';
+      }
+    }
+
+    addDescBtn.addEventListener('click', () => {
+      const text = descInput.value.trim();
+      const author = descAuthor.value.trim() || 'Senior’s Inner Circle';
+      if (!text) return;
+
+      const current = getSavedDescriptions();
+      current.push({ text, author });
+      saveDescriptions(current);
+
+      renderDescriptions();
+      descInput.value = '';
+      descAuthor.value = '';
+    });
+
+    // --- 2. Desert Stuck Prompt Wall ---
+    const desertWall = document.getElementById('desertWall');
+    const desertInput = document.getElementById('desertInput');
+    const desertAuthor = document.getElementById('desertAuthor');
+    const addDesertBtn = document.getElementById('addDesertBtn');
+    const emptyDesertNotice = document.getElementById('emptyDesertNotice');
+
+    function getSavedDesertNotes() {
+      try {
+        return JSON.parse(localStorage.getItem('van_desert_notes')) || [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveDesertNotes(data) {
+      localStorage.setItem('van_desert_notes', JSON.stringify(data));
+    }
+
+    function renderDesertNotes() {
+      const notes = getSavedDesertNotes();
+      desertWall.innerHTML = '';
+
+      if (notes.length > 0) {
+        emptyDesertNotice.style.display = 'none';
+      } else {
+        emptyDesertNotice.style.display = 'block';
+      }
+
+      notes.forEach(noteData => {
+        const card = document.createElement('div');
+        card.className = 'note-card';
+        card.innerHTML = `
+          <p class="note-text">"...${escapeHtml(noteData.text)}"</p>
+          <div class="note-footer">— ${escapeHtml(noteData.author)}</div>
+        `;
+        desertWall.appendChild(card);
+      });
+    }
+
+    addDesertBtn.addEventListener('click', () => {
+      const text = desertInput.value.trim();
+      const author = desertAuthor.value.trim() || 'Senior’s Inner Circle';
+      if (!text) return;
+
+      const current = getSavedDesertNotes();
+      // Prepend so the newest shows up first
+      current.unshift({ text, author });
+      saveDesertNotes(current);
+
+      renderDesertNotes();
+      desertInput.value = '';
+      desertAuthor.value = '';
+    });
+
+    // Initial render on page load
+    renderDescriptions();
+    renderDesertNotes();
   </script>
 </body>
 </html>
